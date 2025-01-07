@@ -470,6 +470,15 @@ func TestBaggageParse(t *testing.T) {
 			},
 		},
 		{
+			name: "property with whitespace".
+			in: "SomeKey=SomeValue;ValueProp \t = \t PropVal",
+			want: baggage.List{
+				"SomeKey": {Value: "SomeValue", Properties: []baggage.Property{
+					{Key: "ValueProp", HasValue: true, Value: "PropVal"},
+				}},
+			},
+		},
+		{
 			name: "invalid member: empty",
 			in:   "foo=,,bar=",
 			err:  errInvalidMember,
