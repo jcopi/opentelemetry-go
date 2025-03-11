@@ -6,6 +6,7 @@ package baggage
 import (
 	"fmt"
 	"math/rand"
+	"net/url"
 	"slices"
 	"strings"
 	"testing"
@@ -295,6 +296,160 @@ func TestBaggageParse(t *testing.T) {
 		want baggage.List
 		err  error
 	}{
+		// Porting test cases from the w3c baggage tests https://github.com/w3c/baggage/blob/856be72730e1f9e036158c2ecce7c76fe9b2ae21/test/test_baggage.py
+		// BaggageTest
+		{
+			name: "test_parse_simple",
+			in:   "SomeKey=SomeValue",
+			want: baggage.List{
+				"SomeKey": {Value: "SomeValue"},
+			},
+		},
+		{
+			name: "test_parse_multiple",
+			in:   "SomeKey=SomeValue;SomeProp,SomeKey2=SomeValue2;ValueProp=PropVal",
+			want: baggage.List{
+				"SomeKey": {
+					Value: "SomeValue",
+					Properties: []baggage.Property{
+						{Key: "SomeProp", HasValue: false},
+					},
+				},
+				"SomeKey2": {
+					Value: "SomeValue2",
+					Properties: []baggage.Property{
+						{Key: "ValueProp", HasValue: true, Value: "PropVal"},
+					},
+				},
+			},
+		},
+		{
+			name: "test_parse_multiple_ows",
+			in:   "SomeKey \t = \t SomeValue \t ; \t SomeProp \t , \t SomeKey2 \t = \t SomeValue2 \t ; \t ValueProp \t = \t PropVal",
+			want: baggage.List{
+				"SomeKey": {
+					Value: "SomeValue",
+					Properties: []baggage.Property{
+						{Key: "SomeProp", HasValue: false},
+					},
+				},
+				"SomeKey2": {
+					Value: "SomeValue2",
+					Properties: []baggage.Property{
+						{Key: "ValueProp", HasValue: true, Value: "PropVal"},
+					},
+				},
+			},
+		},
+		{
+			name: "test_parse_multiple_kv_property",
+			in:   "SomeKey=SomeValue;SomePropKey=SomePropValue,SomeKey2=SomeValue2;SomePropKey2=SomePropValue2",
+			want: baggage.List{
+				"SomeKey": {
+					Value: "SomeValue",
+					Properties: []baggage.Property{
+						{Key: "SomePropKey", HasValue: true, Value: "SomePropValue"},
+					},
+				},
+				"SomeKey2": {
+					Value: "SomeValue2",
+					Properties: []baggage.Property{
+						{Key: "SomePropKey2", HasValue: true, Value: "SomePropValue2"},
+					},
+				},
+			},
+		},
+		{
+			name: "test_parse_multiple_kv_property_ows",
+			in:   "SomeKey \t = \t SomeValue \t ; \t SomePropKey=SomePropValue \t , \t SomeKey2 \t = \t SomeValue2 \t ; \t SomePropKey2 \t = \t SomePropValue2",
+			want: baggage.List{
+				"SomeKey": {
+					Value: "SomeValue",
+					Properties: []baggage.Property{
+						{Key: "SomePropKey", HasValue: true, Value: "SomePropValue"},
+					},
+				},
+				"SomeKey2": {
+					Value: "SomeValue2",
+					Properties: []baggage.Property{
+						{Key: "SomePropKey2", HasValue: true, Value: "SomePropValue2"},
+					},
+				},
+			},
+		},
+
+		// BaggageEntryTest
+		{
+			name: "BaggageEntryTest test_parse_multiple_equals",
+			in:   "SomeKey=SomeValue=equals",
+			want: baggage.List{
+				"SomeKey": {Value: "SomeValue=equals"},
+			},
+		},
+		{
+			name: "BaggageEntryTest test_parse_property",
+			in:   "SomeKey=SomeValue;SomeProp",
+			want: baggage.List{
+				"SomeKey": {
+					Value: "SomeValue",
+					Properties: []baggage.Property{
+						{Key: "SomeProp", HasValue: false},
+					},
+				},
+			},
+		},
+		{
+			name: "BaggageEntryTest test_parse_multiple_property",
+			in:   "SomeKey=SomeValue;SomeProp;SecondProp=PropValue",
+			want: baggage.List{
+				"SomeKey": {
+					Value: "SomeValue",
+					Properties: []baggage.Property{
+						{Key: "SomeProp", HasValue: false},
+						{Key: "SecondProp", HasValue: true, Value: "PropValue"},
+					},
+				},
+			},
+		},
+		{
+			name: "BaggageEntryTest test_parse_kv_property",
+			in:   "SomeKey=SomeValue;SomePropKey=SomePropValue",
+			want: baggage.List{
+				"SomeKey": {
+					Value: "SomeValue",
+					Properties: []baggage.Property{
+						{Key: "SomePropKey", HasValue: true, Value: "SomePropValue"},
+					},
+				},
+			},
+		},
+		{
+			name: "BaggageEntryTest test_parse_simple_ows",
+			in:   "SomeKey \t = \t SomeValue \t ",
+			want: baggage.List{
+				"SomeKey": {Value: "SomeValue"},
+			},
+		},
+		{
+			name: "BaggageEntryTest test_parse_percent_encoded_ows",
+			in:   "SomeKey \t = \t " + url.QueryEscape("\t \"';=asdf!@#$%^&*()") + " \t ",
+			want: baggage.List{
+				"SomeKey": {Value: "\t \"';=asdf!@#$%^&*()"},
+			},
+		},
+		{
+			name: "BaggageEntryTest test_parse_property_ows",
+			in:   "SomeKey \t = \t SomeValue \t ; \t SomeProp",
+			want: baggage.List{
+				"SomeKey": {
+					Value: "SomeValue",
+					Properties: []baggage.Property{
+						{Key: "SomeProp", HasValue: false},
+					},
+				},
+			},
+		},
+
 		{
 			name: "empty value",
 			in:   "",
@@ -471,7 +626,7 @@ func TestBaggageParse(t *testing.T) {
 		},
 		{
 			name: "property with whitespace",
-			in: "SomeKey=SomeValue;ValueProp \t = \t PropVal",
+			in:   "SomeKey=SomeValue;ValueProp \t = \t PropVal",
 			want: baggage.List{
 				"SomeKey": {Value: "SomeValue", Properties: []baggage.Property{
 					{Key: "ValueProp", HasValue: true, Value: "PropVal"},
